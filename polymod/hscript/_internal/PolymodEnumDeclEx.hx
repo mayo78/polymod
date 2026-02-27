@@ -7,4 +7,6 @@ typedef PolymodEnumDeclEx =
     > EnumDecl,
 
     @:optional var pkg:Array<String>;
+
+	@:optional var mod:String;
 }

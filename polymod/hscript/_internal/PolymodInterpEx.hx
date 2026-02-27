@@ -199,11 +199,15 @@ class PolymodInterpEx extends Interp
 		return call(o, func, args);
 	}
 
+	public static var SCRIPT_PREFIX:String = "";
+
+	public static var onClassRegistered:PolymodClassDeclEx->Void;
+
 	private static var _scriptClassDescriptors:Map<String, PolymodClassDeclEx> = new Map<String, PolymodClassDeclEx>();
 
 	private static function registerScriptClass(c:PolymodClassDeclEx)
 	{
-		var name = Util.getFullClassName(c);
+		var name = SCRIPT_PREFIX + Util.getFullClassName(c);
 
 		if (_scriptClassDescriptors.exists(name)) {
 			Polymod.error(SCRIPT_CLASS_ALREADY_REGISTERED, 'Scripted class with fully qualified name "$name" has already been defined. Please change the class name or the package name to ensure uniqueness.');
@@ -211,6 +215,8 @@ class PolymodInterpEx extends Interp
 		} else {
 			Polymod.debug('Registering scripted class $name');
 			_scriptClassDescriptors.set(name, c);
+			if (onClassRegistered != null)
+				onClassRegistered(c);
 		}
 	}
 
@@ -235,6 +241,8 @@ class PolymodInterpEx extends Interp
 
 	private static var _scriptEnumDescriptors:Map<String, PolymodEnumDeclEx> = new Map<String, PolymodEnumDeclEx>();
 
+	public static var onEnumRegistered:PolymodEnumDeclEx->Void;
+
 	private static function registerScriptEnum(e:PolymodEnumDeclEx)
 	{
 		var name = e.name;
@@ -242,6 +250,7 @@ class PolymodInterpEx extends Interp
 		{
 			name = e.pkg.join(".") + "." + name;
 		}
+		name = SCRIPT_PREFIX + name;
 
 		if (_scriptEnumDescriptors.exists(name)) {
 			Polymod.error(SCRIPT_ENUM_ALREADY_REGISTERED, 'An enum with the fully qualified name "$name" has already been defined. Please change the enum name to ensure a unique name.');
@@ -249,6 +258,8 @@ class PolymodInterpEx extends Interp
 		} else {
 			Polymod.debug('Registering enum $name');
 			_scriptEnumDescriptors.set(name, e);
+			if (onEnumRegistered != null)
+				onEnumRegistered(e);
 		}
 	}
 
@@ -1452,6 +1463,8 @@ class PolymodInterpEx extends Interp
 			// Try to retrieve a scripted class with this name in the same package.
 			if (getClassDecl().pkg != null && getClassDecl().pkg.length > 0){
 				var localClassId = getClassDecl().pkg.join('.') + "." + id;
+				if (getClassDecl().mod != null)
+					localClassId = getClassDecl().mod + ":" + localClassId;
 				var result = PolymodStaticClassReference.tryBuild(localClassId);
 				if (result != null) return result;
 			}
@@ -1509,6 +1522,9 @@ class PolymodInterpEx extends Interp
 			var name = cls.name;
 			if (cls.pkg != null && cls.pkg.length > 0) {
 				name = cls.pkg.join('.') + "." + name;
+			}
+			if (cls.mod != null) {
+				name = cls.mod + ":" + name;
 			}
 			return PolymodScriptClass.getScriptClassStaticField(name, id);
 		}

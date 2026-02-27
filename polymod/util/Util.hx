@@ -13,6 +13,7 @@ import polymod.format.ParseRules.TextFileFormat;
 import polymod.format.ParseRules;
 import polymod.fs.PolymodFileSystem.IFileSystem;
 import polymod.hscript._internal.PolymodClassDeclEx;
+import polymod.hscript._internal.PolymodEnumDeclEx;
 #if unifill
 import unifill.Unifill;
 #end
@@ -724,5 +725,15 @@ class Util
 	public static function getFullClassName(clsDecl:PolymodClassDeclEx):String
 	{
 		return (clsDecl.pkg != null ? (clsDecl.pkg.join(".") + ".") : "") + clsDecl.name;
+	}
+
+	/**
+	 * Retrieves the full qualified name of a enum declaration.
+	 * @param eDecl The enum declaration.
+	 * @return String
+	 */
+	public static function getFullEnumName(eDecl:PolymodEnumDeclEx):String
+	{
+		return (eDecl.pkg != null ? (eDecl.pkg.join(".") + ".") : "") + eDecl.name;
 	}
 }

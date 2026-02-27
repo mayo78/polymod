@@ -19,6 +19,8 @@ typedef PolymodClassDeclEx =
 
 	@:optional var staticFields:Array<FieldDecl>;
 	@:optional var usings:Map<String, PolymodClassImport>;
+
+	@:optional var mod:String;
 }
 
 /**
@@ -98,10 +100,14 @@ class PolymodStaticClassReference {
 	}
 
 	public function getFullyQualifiedName():String {
+		var name = this.cls.name;
 		if (this.cls.pkg != null && this.cls.pkg.length > 0) {
-			return this.cls.pkg.join(".") + "." + this.cls.name;
+			name = this.cls.pkg.join(".") + "." + this.cls.name;
 		}
-		return this.cls.name;
+		if (this.cls.mod != null) {
+			name = this.cls.mod + ":" + name;
+		}
+		return name;
 	}
 
 	public function toString():String {
