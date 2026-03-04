@@ -3,22 +3,78 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-# [1.9.0] - 202?-??-??
+# [2.0.0] - 2026-??-??
 ## Added
-- Scripted classes can now access static functions of other modules.
-  - Scripted classes currently can't be imported, but you can statically access any scripted class by name as long as it is defined in the same package.
-  - You should also be able to reliably access scripted classes from the same file.
-- Scripted class instances can now be constructed directly from another script.
-  - For example, if you have declared `class MyScriptedClass extends Stage` in an hxc file, then another hxc file can call `new MyScriptedClass()` rather than having to call `ScriptedStage.init('MyScriptedClass')`.
-- Added a new Polymod warning which gets invoked when a mod is skipped for having an incompatible API version.
-- Added a new Polymod warning which gets invoked when attempting to create two scripted classes with the same qualified name.
-  - This previously silently failed, causing unintended behavior!
+- You can now declare and access static variables and functions of scripted classes, even from other scripts.
+- You can directly instantiate a scripted class by name from another script (`new TestClass()` instead of `ScriptedBar.init('TestClass', [])`).
+- Scripted classes can now extend an aliased class.
+  - For example, if you `import foo.Bar as Baz;`, you can do `class TestClass extends Baz`.
+- You can now use the `package` keyword in a scripted class to specify a package name for a scripted class, preventing the `SCRIPTED_CLASS_ALREADY_REGISTERED` warning.
 - Added the new function `Polymod.clearAllScriptClasses()` to clear all registered scripted class descriptors.
+- Added new generated function to classes implementing `HScriptedClass`:
+  - `scriptStaticCall` to invoke a static function on a scripted class.
+  - `scriptStaticGet` to retrieve a static variable on a scripted class.
+  - `scriptStaticSet` to assign a static variable on a scripted class.
+- Added the ability to import and access static fields and methods of `abstract`s.
+- Added the ability to import and access values of `enum abstract`s.
+- Added the ability to import and access `typedef`s (they will be aliased to the appropriate type).
+- Added the new `scriptHas` function to scripted class implementations to check for field existance.
+- Added support for import renaming using the `as` keyword. () - by @KoloInDaCrib in [#190]
+- Added support for properties, with getters and setters. () - by @KoloInDaCrib in [#191]
+  - When using `var myValue(get, set):Int;`, accessing and assigning `myValue` will instead call `get_myValue` and `set_myValue` respectively.
+- Added support for scripted `enum` values, accessible from other scripts. () - by @lemz1 in [#192]
+- Added support for the `final` keyword. () - by @KoloInDaCrib in [#193]
+- Added support for scripted classes to import other scripted classes that are in a different package. Scripted classes with the same package will be automatically imported. () - by @lemz1 in [#194]
+- Added the ability to blacklist static or instance fields or methods. () - by @KoloInDaCrib in [#216]
+  - Use `Polymod.blacklistStaticFields(Class, Array<String>)` to blacklist static variables or functions from being accessed by scripts.
+  - Use `Polymod.blacklistInstanceFields(Class, Array<String>)` to blacklist instance variables or functions from being accessed by scripts.
+  - When using `final myValue = 12;`, attempting to reassign the value throws an error.
+- Added support for static extensions via the `using` keyword. () - by @KoloInDaCrib in [#218]
+- Added support for scripted classes to extend other scripted classes. () - by @KoloInDaCrib in [#285]
+- Added support for typedef extensions, and optional fields in typedefs. () - by @Starexify in [#290]
+- Added support for string interpolation (i.e. you can now use `'${value}'` instead of string concatenation). () - by @NotHyper-474 in [#292]
 ## Changed
+- Polymod's scripting systems now utilize an internal, built-in fork of HScript, rather than a separate repository. This allows for new features and support to be added (such as new keywords and syntax) without having to require a specific non-standard version of the Haxelib.
+  - Refactored the internal fork of HScript to fold in the extending classes, greatly simplifying the codebase for the HScript implementation.
+  - Combined `PolymodExprEx` with `Expr`, unifying the `Error` and `ErrorEx` classes and simplifying the codebase. () - by @NotHyper-474 in [#344]
+- Added improved error messages for the following cases:
+  - Attempting to access `this` from a scripted static function.
+  - Attempting to access a blacklisted static or instance field.
+  - Attempting to declare a field with a duplicate name (previously, this silently replaced the field, leading to weird bugs!). () - by @KoloInDaCrib in [#261]
+- Cleaned up a lot of existing error messages to be more clear what they're doing.
+- Added a new CheckStyle config, and performed a lot of code cleanup across the project to standardize code style.
+- If a mod is skipped because its API version is invalid, it will now output a `MOD_API_VERSION_MISMATCH` warning.
+- File accesses are now case insensitive by default, to create similar behavior between Linux and Windows. () - by @mikolka9144 in [#212]
+  - Functionality also implemented for the ZIPFileSystem. Use `PolymodConfig.caseInsensitiveZipLoading` to configure. () - by @NotHyper-474 in [#204]
+- Polymod will automatically clear any cached scripts before loading them again. () - by @KoloInDaCrib in [#247]
+- Function calls now support an arbitrary number of arguments, up from eight. () - by @NotHyper-474 in [#278]
+- Scripted classes no longer have to extend anything (a scripted class that has no superclass can only be instantiated from other scripts). () - by @NotHyper-474 in [#280]
+- `interface`s and uses of `implements` now get properly parsed instead of throwing an error (they aren't enforced right now, though) () - by @Starexify in [#284]
+- The `init` function of scripted class implementations has been renamed to `scriptInit`; this is a breaking change but should be an easy rename. () - by @NotHyper-474 in [#286]
+  - This PR also fixes an issue where constructor arguments wouldn't be parsed correctly.
 ## Fixed
 - Fixed a Null Object Reference error that could occur if a scripted class attempts to extend a superclass which hasn't been imported.
-- Fixed an issue where Polymod would not interpret some boolean compilation flags correctly, resulting in enabled flags being ignored.
-- Resolve error "Type not found: T" caused by not properly deparameterizing scripted class types. (via @Geokureli)
+- Optimized the `HScriptedClass` macro to no longer require reflection when the script does not override the function being called.
+- When instantiating a `Map` or `Array`, the type of the variable will sometimes be parsed to ensure the correct underlying type is created.
+  - For example, `var myValue:Map<String, Dynamic> = [];` used to sometimes instantiate an Array value, causing errors.
+- Refactored and cleaned up asset exclusion.
+- Fixed issues with asset retrieval through Lime on HTML5.
+- Fixed the `list()` function implementation to make it more consistent with Lime's behavior.
+- Fixed an issue where attempting to list assets from a specific library would display all assets from all libraries instead.
+- Resolve a build error `Type not found: T` caused by not properly deparameterizing scripted class types. () - by @Geokureli in [#178]
+- Fixed an issue where try/catch blocks would prevent the rest of the function from being called properly. () - by @NotHyper-474 in [#199]
+- `PolymodScriptClass.className` now returns a properly formatted value. () - by @cyn0x8 in [#202]
+- Fix an issue where `DefineUtil.getDefineBool` would always return false, even if a different default value was provided. () - by @NotHyper-474 in [#208]
+- Fixed an issue where some expressions would be evaluated twice, causing a deranged context loss error. () - by @NotHyper-474 in [#234]
+- Fixed an issue where static variables with no expression would throw a Null Object Reference. () - by @NotHyper-474 in [#239]
+- Fixed an issue where `Array.remove()` could not be called on HTML5. () - by @KoloInDaCrib in [#251]
+- Fixed an issue where local variables would still be in scope in static functions. () - by @NotHyper-474 in [#281]
+- Fixed an issue where static extensions couldn't be used in static functions. () - by @NotHyper-474 in [#282]
+- Fixed an issue where the `is` keyword had the wrong operator priority. () - by @Starexify in [#290]
+- Fixed an issue where enum constructors couldn't be called with multiple arguments. () - by @Starexify in [#296]
+- Fixed an issue causing variables to be lost when local functions were called. () - by @NotHyper-474 in [#311]
+- Fixed an issue where the game would crash when attempting to process minimum argument counts for getters and setters. () - by @Starexify in [#312]
+- Fixed an issue causing projects to be unable to compile when `hscriptPos` was disabled. () - by @lemz1 in [#314]
 
 # [1.8.0] - 2024-07-26
 The version is the result of resolving practical needs that arose from using Polymod with [Friday Night Funkin'](https://github.com/FunkinCrew/Funkin) over the past year and a half!
@@ -26,7 +82,7 @@ The version is the result of resolving practical needs that arose from using Pol
 - Added the config option `frameworkParams.coreAssetRedirect` which lets you use another directory as your primary `assets/` folder.
   - This is useful if you are hot reloading scripts or other data files!
 - Added the `loadScriptsAsync` parameter to `Polymod.init()` to load scripted classes asynchronously.
-- Reworked `_append` and `_merge` functionality for JSON. 
+- Reworked `_append` and `_merge` functionality for JSON.
   - `_append` now adds the keys of the provided JSON to the target JSON.
   - `_merge` now utilizes a [JSONPatch](https://jsonpatch.com/) file to modify the target JSON with operations.
     - This implementation of JSONPatch has been modified to allow for [JSONPath](https://goessner.net/articles/JsonPath/) strings in the `path` argument.
@@ -228,7 +284,7 @@ Version 1.4.2 includes a large number of bug fixes and tweaks to improve reliabi
   - These convenience functions perform the proper steps to reload Polymod. Note you may need to call `clearCache()` depending on your framework and your app's current state.
   - `loadMod()` and `loadMods()` enables an individual (or multiple) mods, by re-initializing the framework with the appropriate mods enabled.
   - `unloadMod()` and `unloadMods()` disables an individual (or multiple) mods, by re-initializing the framework with the appropriate mods disabled.
-  - `unloadAllMods()` disables all mods, by re-initializing the framework with no mods enabled. 
+  - `unloadAllMods()` disables all mods, by re-initializing the framework with no mods enabled.
     - Localized asset replacements will still work, but no user-defined mods will be loaded.
   - `disable()` fully disables Polymod, destroying the asset handler.
     - Neither user-defined mods nor localized asset replacements will work until you call `init()` again.
@@ -285,7 +341,7 @@ This release marks the migration of the project documentation to [polymod.io](ht
   - Added `FLIXEL` as a Framework value to manually select this backend.
   - Updated the framework detector to use the `FlixelBackend` over the `OpenFLBackend` when HaxeFlixel is being used.
 - Added a new function, `Polymod.clearCache()`, which triggers the backend to clear any cached assets from memory.
-  - This is useful if you want to ensure assets reload after a modlist or locale change. 
+  - This is useful if you want to ensure assets reload after a modlist or locale change.
 - Improved the Mod Metadata format with new and useful attributes.
   - These changes are backwards compatible; new fields are optional, and changed fields still support the existing format.
   - Added the `homepage` attribute to allow mods to provide a URL.

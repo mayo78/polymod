@@ -19,6 +19,7 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
+
 package polymod.hscript._internal;
 
 import haxe.PosInfos;
@@ -51,7 +52,9 @@ class Interp
   public function new()
   {
     locals = new Map();
-    declared = new Array();
+    declared = [];
+    depth = 0;
+    inTry = false;
     resetVariables();
     initOps();
   }
@@ -127,7 +130,11 @@ class Interp
 
   function assign(e1:Expr, e2:Expr):Dynamic
   {
-    var v = expr(e2);
+    return assignValue(e1, expr(e2));
+  }
+
+  function assignValue(e1:Expr, v:Dynamic, _abstractInlineAssign:Bool = false):Dynamic
+  {
     switch (Tools.expr(e1))
     {
       case EIdent(id):
@@ -151,7 +158,10 @@ class Interp
         }
 
       default:
-        error(EInvalidOp("="));
+        if (!_abstractInlineAssign)
+        {
+          error(EInvalidOp("="));
+        }
     }
     return v;
   }
