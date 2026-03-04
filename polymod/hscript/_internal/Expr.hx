@@ -257,6 +257,8 @@ typedef ClassDecl =
    * so imports have to be done in two passes.
    */
   var importsToValidate:Map<String, ClassImport>;
+
+	@:optional var mod:String;
 }
 
 /**
