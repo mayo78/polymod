@@ -11,9 +11,9 @@ using StringTools;
  * or for accessing static fields or methods.
  */
 class PolymodStaticClassReference {
-	public var cls:PolymodClassDeclEx;
+	public var cls:ClassDecl;
 
-	public function new(cls:PolymodClassDeclEx) {
+	public function new(cls:ClassDecl) {
 		this.cls = cls;
 	}
 

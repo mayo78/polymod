@@ -225,16 +225,16 @@ class PolymodInterpEx extends Interp
 
 	public static var SCRIPT_PREFIX:String = "";
 
-	public static var onClassRegistered:PolymodClassDeclEx->Void;
+	public static var onClassRegistered:ClassDecl->Void;
 
   private static var _scriptClassDescriptors:Map<String, ClassDecl> = new Map<String, ClassDecl>();
 
-	private static function registerScriptClass(c:PolymodClassDeclEx)
+	private static function registerScriptClass(c:ClassDecl)
 	{
 		var name = SCRIPT_PREFIX + Util.getFullClassName(c);
 
 		if (_scriptClassDescriptors.exists(name)) {
-			Polymod.error(SCRIPT_CLASS_ALREADY_REGISTERED, 'Scripted class with fully qualified name "$name" has already been defined. Please change the class name or the package name to ensure uniqueness.');
+			Polymod.error(SCRIPTED_CLASS_ALREADY_REGISTERED, 'Scripted class with fully qualified name "$name" has already been defined. Please change the class name or the package name to ensure uniqueness.');
 			return;
 		} else {
 			Polymod.debug('Registering scripted class $name');
@@ -296,7 +296,7 @@ class PolymodInterpEx extends Interp
 		name = SCRIPT_PREFIX + name;
 
 		if (_scriptEnumDescriptors.exists(name)) {
-			Polymod.error(SCRIPT_ENUM_ALREADY_REGISTERED, 'An enum with the fully qualified name "$name" has already been defined. Please change the enum name to ensure a unique name.');
+			Polymod.error(SCRIPTED_CLASS_ALREADY_REGISTERED, 'An enum with the fully qualified name "$name" has already been defined. Please change the enum name to ensure a unique name.');
 			return;
 		} else {
 			Polymod.debug('Registering enum $name');
