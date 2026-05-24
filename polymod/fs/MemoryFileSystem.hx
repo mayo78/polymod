@@ -20,7 +20,7 @@ import thx.semver.VersionRule;
  * Using this file system directly is not recommended, as it is not optimized for native platforms.
  * If you can use a native file system, use `SysFileSystem` or `ZipFileSystem` instead.
  */
-class MemoryFileSystem implements PolymodFileSystem.IFileSystem
+class MemoryFileSystem implements IFileSystem
 {
   var files = new Map<String, Bytes>();
   var directories:Array<String> = [];
@@ -176,7 +176,7 @@ class MemoryFileSystem implements PolymodFileSystem.IFileSystem
 
       if (!isDirectory(testDir)) continue;
 
-      var meta:ModMetadata = getMetadata(dir);
+      var meta:ModMetadata = getMetadataByDir(dir, PolymodErrorOrigin.SCAN);
 
       if (meta == null) continue;
 
@@ -188,9 +188,15 @@ class MemoryFileSystem implements PolymodFileSystem.IFileSystem
     return result;
   }
 
-  public function getMetadata(modId:String, ?origin:PolymodErrorOrigin):Null<ModMetadata>
+  @:deprecated("getMetadata is deprecated, use getMetadataByDir")
+  public function getMetadata(dirName:String, ?origin:PolymodErrorOrigin):Null<ModMetadata>
   {
-    var modpath = Util.pathJoin(modRoot, modId);
+    return getMetadataByDir(dirName, origin);
+  }
+
+  public function getMetadataByDir(dirName:String, ?origin:PolymodErrorOrigin):Null<ModMetadata>
+  {
+    var modpath = Util.pathJoin(modRoot, dirName);
     if (exists(modpath))
     {
       var meta:ModMetadata = null;
@@ -209,7 +215,8 @@ class MemoryFileSystem implements PolymodFileSystem.IFileSystem
         meta = ModMetadata.fromJsonStr(metaText, origin);
         if (meta == null) return null;
 
-        meta.id = modId;
+        meta.id = meta.id == '' ? dirName : meta.id;
+        meta.dirName = dirName;
         meta.modPath = modpath;
       }
 
@@ -227,8 +234,13 @@ class MemoryFileSystem implements PolymodFileSystem.IFileSystem
     }
     else
     {
-      Polymod.error(MOD_MISSING_DIRECTORY, 'Could not find mod directory: $modpath', origin);
+      Polymod.error(MOD_MISSING_DIRECTORY, 'Could not find mod directory: $dirName', origin);
     }
+    return null;
+  }
+
+  public function getMetadataById(modId:String, ?origin:PolymodErrorOrigin):Null<ModMetadata>
+  {
     return null;
   }
 }

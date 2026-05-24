@@ -415,7 +415,15 @@ class PolymodScriptClass
           var importedClass:ClassImport = c.imports.get(clsName);
           if (importedClass != null && importedClass.cls != null)
           {
-            targetClass = importedClass.cls;
+            if (untyped !importedClass.cls._isHScriptedClass)
+            {
+              Polymod.error(SCRIPT_PARSE_FAILED, 'Cannot extend non-scriptable class ("${Util.getFullClassName(c)}" tried extending "${pth.join('.')}").', SCRIPT_RUNTIME);
+              return;
+            }
+            else
+            {
+              targetClass = importedClass.cls;
+            }
           }
           else if (importedClass != null && importedClass.cls == null)
           {
@@ -586,7 +594,7 @@ class PolymodScriptClass
     if (fn != null)
     {
       // previousValues is used to restore variables after they are shadowed in the local scope.
-      var previousValues:Map<String, Dynamic> = _interp.setFunctionValues(fn, args, fnName);
+      var previousValues:Map<String, Dynamic> = [];
 
       // Copy the locals and store them for later.
       var localsCopy:Map<String, {r:Dynamic, ?isfinal:Null<Bool>}> = _interp.locals.copy();
@@ -594,6 +602,7 @@ class PolymodScriptClass
       var r:Dynamic = null;
       try
       {
+        previousValues = _interp.setFunctionValues(fn, args, fnName);
         r = _interp.executeEx(fn.expr);
       }
       catch (err:Expr.Error)
@@ -879,7 +888,7 @@ class PolymodScriptClass
           _cachedVarDecls.set(f.name, v);
           if (v.expr != null)
           {
-            var varValue = this._interp.expr(v.expr);
+            var varValue = this._interp.exprWithType(v.expr, v.type);
             this._interp.variables.set(f.name, varValue);
           }
         default:

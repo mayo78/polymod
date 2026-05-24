@@ -15,7 +15,6 @@ import haxe.Constraints.IMap;
 import haxe.ds.StringMap;
 import haxe.io.Bytes;
 import haxe.io.Path;
-import polymod.Polymod.ModMetadata;
 import polymod.util.Util;
 import polymod.util.InsensitiveMap;
 import polymod.util.zip.ZipParser;
@@ -61,7 +60,7 @@ class SysZipFileSystem extends SysFileSystem
     if (params.autoScan) addAllZips();
   }
 
-  #if linux
+  #if (!windows)
   public override function getPathLike(path:String):Null<String>
   {
     var filePath = filesLocations.get(path);

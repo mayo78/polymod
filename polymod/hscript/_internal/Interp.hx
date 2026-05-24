@@ -325,7 +325,7 @@ class Interp
 
   inline function error(e:#if hscriptPos ErrorDef #else Error #end, rethrow = false):Dynamic
   {
-    #if hscriptPos var e = new Error(e, curExpr.pmin, curExpr.pmax, curExpr.origin, curExpr.line); #end
+    #if hscriptPos var e = new Error(e, curExpr?.pmin ?? 0, curExpr?.pmax ?? 0, curExpr?.origin ?? 'unknown', curExpr?.line ?? 0); #end
     if (rethrow) this.rethrow(e)
     else
       throw e;
@@ -448,6 +448,8 @@ class Interp
         throw SBreak;
       case EContinue:
         throw SContinue;
+      case ECast(e, t):
+        return expr(e);
       case EReturn(e):
         returnValue = e == null ? null : expr(e);
         throw SReturn;

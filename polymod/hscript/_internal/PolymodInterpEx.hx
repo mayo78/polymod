@@ -204,6 +204,15 @@ class PolymodInterpEx extends Interp
     }
     #end
 
+    // Functions natively don't have the .bind() function, so we have to do them here.
+    if (f == "bind" && Reflect.isFunction(o))
+    {
+      return Reflect.makeVarArgs(function(bindArgs:Array<Dynamic>)
+      {
+        return Reflect.callMethod(null, o, args.concat(bindArgs));
+      });
+    }
+
     if (Std.isOfType(o, HScriptedClass))
     {
       // This is a scripted class!
@@ -248,8 +257,8 @@ class PolymodInterpEx extends Interp
   {
     super.resetVariables();
 
-    variables.set("Math", Math);
-    variables.set("Std", Std);
+    variables.set("Math", #if hl polymod.hscript._internal.HLWrapperMacro.HLMath #else Math #end);
+    variables.set("Std", #if hl polymod.hscript._internal.HLWrapperMacro.HLStd #else Std #end);
 
     variables.set("Array", Array);
     variables.set("Bool", Bool);
@@ -282,11 +291,11 @@ class PolymodInterpEx extends Interp
     return _scriptClassDescriptors.get(name);
   }
 
-  private static var _scriptEnumDescriptors:Map<String, PolymodEnumDeclEx> = new Map<String, PolymodEnumDeclEx>();
+  private static var _scriptEnumDescriptors:Map<String, EnumDecl> = new Map<String, EnumDecl>();
 
-	public static var onEnumRegistered:PolymodEnumDeclEx->Void;
+	public static var onEnumRegistered:EnumDecl->Void;
 
-	private static function registerScriptEnum(e:PolymodEnumDeclEx)
+	private static function registerScriptEnum(e:EnumDecl)
 	{
 		var name = e.name;
 		if (e.pkg != null)
@@ -1202,7 +1211,12 @@ class PolymodInterpEx extends Interp
     {
       try
       {
+        #if hl
+        // HL is a bit weird with iterators with arguments
+        v = Reflect.callMethod(v, v.iterator, []);
+        #else
         v = v.iterator();
+        #end
       }
       catch (e:Dynamic) {};
     }
@@ -1353,6 +1367,7 @@ class PolymodInterpEx extends Interp
     }
 
     var oCls:String = Util.getTypeNameOf(o);
+    #if hl oCls = oCls.replace('$', ''); #end
 
     // Check if the field is a blacklisted static field.
     if (PolymodScriptClass.blacklistedStaticFields.exists(o) && PolymodScriptClass.blacklistedStaticFields.get(o).contains(f))
@@ -1438,8 +1453,27 @@ class PolymodInterpEx extends Interp
       // #end
       // return result;
     }
+    #if (hl && haxe4)
+    else if (Std.isOfType(o, Enum))
+    {
+      try
+      {
+        return (o : Enum<Dynamic>).createByName(f);
+      }
+      catch (e)
+      {
+        error(EInvalidAccess(f));
+      }
+    }
+    #end
 
     // Default behavior
+    #if hl
+    // On HL, hasField on properties returns true but Reflect.field
+    // might return null so we have to check if a getter exists too.
+    // This happens mostly when the programmer mistakenly makes the field access (get, null) instead of (get, never)
+    return Reflect.getProperty(o, f);
+    #else
     if (Reflect.hasField(o, f))
     {
       return Reflect.field(o, f);
@@ -1455,6 +1489,7 @@ class PolymodInterpEx extends Interp
         return Reflect.field(o, f);
       }
     }
+    #end
     // return super.get(o, f);
   }
 
@@ -1463,6 +1498,7 @@ class PolymodInterpEx extends Interp
     if (o == null) error(ENullObjectReference(f));
 
     var oCls:String = Util.getTypeNameOf(o);
+    #if hl oCls = oCls.replace('$', ''); #end
 
     // Check if the field is a blacklisted static field.
     if (PolymodScriptClass.blacklistedStaticFields.exists(o) && PolymodScriptClass.blacklistedStaticFields.get(o).contains(f))
@@ -1711,7 +1747,7 @@ class PolymodInterpEx extends Interp
 
   public function addModule(moduleContents:String, ?origin:String = "hscript")
   {
-    var parser = new PolymodParserEx();
+    var parser = new Parser();
     var decls = parser.parseModule(moduleContents, origin);
     registerModules(decls, origin);
   }
@@ -1905,16 +1941,25 @@ class PolymodInterpEx extends Interp
     if (args == null) return;
 
     var minParams = 0;
+    //var maxAllowed = params.length;
+
     for (i in 0...params.length)
     {
       var p = params[i];
       if (!p.opt && p.value == null) minParams = i + 1;
     }
 
+    final funcName:String = (name != null) ? " for function '" + name + "'" : "";
     if (args.length < minParams)
     {
-      error(EInvalidArgCount((name != null) ? " for function '" + name + "'" : "", minParams, args.length));
+      error(EInvalidArgCount(funcName, minParams, args.length));
     }
+//    else if (args.length > maxAllowed)
+//    {
+//      // Manual return for `new` as parameter count shouldn't matter here
+//      if (name == "new") return;
+//      error(EExceedArgsCount(funcName, maxAllowed, args.length));
+//    }
   }
 
   public function hasScriptClassStaticFunction(clsName:String, fnName:String):Bool
@@ -2336,10 +2381,13 @@ class PolymodInterpEx extends Interp
               });
           }
 
-          var enumDecl:PolymodEnumDeclEx =
+          var enumDecl:EnumDecl =
             {
               pkg: pkg,
               name: e.name,
+              meta: e.meta,
+              params: e.params,
+              isPrivate: e.isPrivate,
               fields: e.fields,
             };
 

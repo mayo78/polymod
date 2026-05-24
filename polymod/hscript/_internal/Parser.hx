@@ -23,6 +23,7 @@
 package polymod.hscript._internal;
 
 import polymod.hscript._internal.Expr;
+import polymod.util.DefineUtil;
 
 enum Token
 {
@@ -55,6 +56,9 @@ private enum InterpState
   Expr(depth:Int, ?quoteChar:Int);
 }
 
+#if hscript_typer
+@:access(polymod.hscript._internal.PolymodTyperEx)
+#end
 class Parser
 {
   // config / variables
@@ -67,7 +71,7 @@ class Parser
   /**
     allows to check for #if / #else in code
   **/
-  public var preprocesorValues:Map<String, Dynamic> = new Map();
+  public static var preprocesorValues(get, default):Map<String, Dynamic>;
 
   /**
     activate JSON compatiblity
@@ -184,6 +188,7 @@ class Parser
   {
     // line=1 - don't reset line : it might be set manualy
     preprocStack = [];
+    preprocessing = false;
     #if hscriptPos
     this.origin = origin;
     readPos = 0;
@@ -460,6 +465,7 @@ class Parser
         switch (tk)
         {
           case TPClose:
+            preprocessing = false;
             if (maybe(TOp("->")))
             {
               var arg = exprToArg(e);
@@ -727,6 +733,7 @@ class Parser
     }
   }
 
+  var inSwitchCase:Bool = false;
   function parseStructure(id)
   {
     #if hscriptPos
@@ -895,6 +902,7 @@ class Parser
           switch (tk)
           {
             case TId("case"):
+              inSwitchCase = true;
               var c = {values: [], expr: null};
               cases.push(c);
               while (true)
@@ -907,6 +915,7 @@ class Parser
                   case TComma:
                     // next expr
                   case TDoubleDot:
+                    inSwitchCase = false;
                     break;
                   default:
                     unexpected(tk);
@@ -958,6 +967,20 @@ class Parser
           }
         }
         mk(ESwitch(e, cases, def), p1, tokenMax);
+      case "cast":
+        if (maybe(TPOpen))
+        {
+          var e = parseExpr();
+          var t = null;
+          if (allowTypes && maybe(TComma)) t = parseType();
+          ensure(TPClose);
+          return mk(ECast(e, t), p1, tokenMax);
+        }
+        else
+        {
+          var e = parseExpr();
+          return mk(ECast(e, null), p1, pmax(e));
+        }
       default:
         null;
     }
@@ -1394,6 +1417,16 @@ class Parser
       push(tk);
       decls.push(parseModuleDecl());
     }
+
+    #if hscript_typer
+    PolymodTyperEx.allModules.push(
+      {
+        decls: decls,
+        code: content,
+        origin: origin,
+      });
+    #end
+
     return decls;
   }
 
@@ -1573,6 +1606,7 @@ class Parser
           });
       case "enum":
         var name = getIdent();
+        var params = parseParams();
 
         var fields = [];
         ensure(TBrOpen);
@@ -1585,6 +1619,9 @@ class Parser
         return DEnum(
           {
             name: name,
+            meta: meta,
+            params: params,
+            isPrivate: isPrivate,
             fields: fields
           });
       case "interface":
@@ -1650,6 +1687,7 @@ class Parser
         case "function":
           var name = getIdent();
           var inf = parseFunctionDecl();
+          maybe(TSemicolon);
           return {
             name: name,
             meta: meta,
@@ -2319,6 +2357,7 @@ class Parser
               if (!ops[char])
               {
                 this.char = char;
+                if (inSwitchCase && op == '|') return TComma; // In switch case handle | as a ,
                 return TOp(op);
               }
               var pop = op;
@@ -2338,7 +2377,7 @@ class Parser
             {
               char = readChar();
               if (StringTools.isEof(char)) char = 0;
-              if (!idents[char])
+              if (!idents[char] && (!preprocessing || char != '.'.code))
               {
                 this.char = char;
                 return TId(id);
@@ -2359,11 +2398,13 @@ class Parser
   }
 
   var preprocStack:Array<{r:Bool}>;
+  var preprocessing:Bool;
 
-  function parsePreproCond()
+  function parsePreproCond():Expr
   {
-    var tk = token();
-    return switch (tk)
+    preprocessing = true;
+    var tk:Token = token();
+    var result:Expr = switch (tk)
     {
       case TPOpen:
         push(TPOpen);
@@ -2373,8 +2414,11 @@ class Parser
       case TOp("!"):
         mk(EUnop("!", true, parsePreproCond()), tokenMin, tokenMax);
       default:
+        preprocessing = false;
         unexpected(tk);
     }
+    preprocessing = false;
+    return result;
   }
 
   function evalPreproCond(e:Expr)
@@ -2387,10 +2431,36 @@ class Parser
         return !evalPreproCond(e);
       case EParent(e):
         return evalPreproCond(e);
-      case EBinop("&&", e1, e2):
-        return evalPreproCond(e1) && evalPreproCond(e2);
-      case EBinop("||", e1, e2):
-        return evalPreproCond(e1) || evalPreproCond(e2);
+      case EBinop(op, e1, e2):
+        inline function evalPreproValue(e:Expr)
+        {
+          return switch (expr(e))
+          {
+            case EIdent(id): id;
+            case EConst(CString(str, _)): str;
+            case EConst(CInt(num)): Std.string(num);
+            case EConst(CFloat(num)): Std.string(num);
+            default: null;
+          }
+        }
+
+        var value1 = evalPreproValue(e1);
+        var value2 = evalPreproValue(e2);
+
+        return switch (op)
+        {
+          case "&&": evalPreproCond(e1) && evalPreproCond(e2);
+          case "||": evalPreproCond(e1) || evalPreproCond(e2);
+          case ">=": (preprocValue(value1) ?? value1) >= (preprocValue(value2) ?? value2);
+          case ">": (preprocValue(value1) ?? value1) > (preprocValue(value2) ?? value2);
+          case "<=": (preprocValue(value1) ?? value1) <= (preprocValue(value2) ?? value2);
+          case "<": (preprocValue(value1) ?? value1) < (preprocValue(value2) ?? value2);
+          case "==": (preprocValue(value1) ?? value1) == (preprocValue(value2) ?? value2);
+          case "!=": (preprocValue(value1) ?? value1) != (preprocValue(value2) ?? value2);
+          default:
+            error(EInvalidPreprocessor("Invalid operator " + op), currentPos, currentPos);
+            return false;
+        }
       default:
         error(EInvalidPreprocessor("Can't eval " + expr(e).getName()), currentPos, currentPos);
         return false;
@@ -2446,12 +2516,13 @@ class Parser
     while (true)
     {
       var tk = token();
-      if (tk == TEof) error(EInvalidPreprocessor("Unclosed"), pos, pos);
       if (preprocStack[spos] != obj)
       {
         push(tk);
         break;
       }
+
+      if (tk == TEof) error(EInvalidPreprocessor("Unclosed"), pos, pos);
     }
   }
 
@@ -2538,5 +2609,11 @@ class Parser
       case TMeta(id): "@" + id;
       case TPrepro(id): "#" + id;
     }
+  }
+
+  static function get_preprocesorValues()
+  {
+    if (preprocesorValues == null) preprocesorValues = DefineUtil.getDefines();
+    return preprocesorValues;
   }
 }

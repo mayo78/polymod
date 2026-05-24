@@ -8,7 +8,7 @@ import polymod.util.Util;
 import polymod.util.VersionUtil;
 import thx.semver.VersionRule;
 
-#if linux
+#if (!windows)
 using StringTools;
 #end
 
@@ -27,7 +27,7 @@ class SysFileSystem implements IFileSystem
 
   public function exists(path:String)
   {
-    #if linux
+    #if (!windows)
     return getPathLike(path) != null;
     #else
     return sys.FileSystem.exists(path);
@@ -36,7 +36,7 @@ class SysFileSystem implements IFileSystem
 
   public function isDirectory(path:String)
   {
-    #if linux
+    #if (!windows)
     path = getPathLike(path);
     #end
     return sys.FileSystem.isDirectory(path);
@@ -46,7 +46,7 @@ class SysFileSystem implements IFileSystem
   {
     try
     {
-      #if linux
+      #if (!windows)
       path = getPathLike(path);
       #end
       return sys.FileSystem.readDirectory(path);
@@ -60,7 +60,7 @@ class SysFileSystem implements IFileSystem
 
   public function getFileContent(path:String)
   {
-    #if linux
+    #if (!windows)
     path = getPathLike(path);
     #end
     return getFileBytes(path).toString();
@@ -68,7 +68,7 @@ class SysFileSystem implements IFileSystem
 
   public function getFileBytes(path:String)
   {
-    #if linux
+    #if (!windows)
     path = getPathLike(path);
     if (path == null) return null;
     #else
@@ -88,7 +88,7 @@ class SysFileSystem implements IFileSystem
       var fullDir = Util.pathJoin(modRoot, dir);
       if (!isDirectory(fullDir)) continue;
 
-      var meta:ModMetadata = this.getMetadata(dir, PolymodErrorOrigin.SCAN);
+      var meta:ModMetadata = this.getMetadataByDir(dir, PolymodErrorOrigin.SCAN);
 
       if (meta == null) continue;
 
@@ -106,9 +106,15 @@ class SysFileSystem implements IFileSystem
     return result;
   }
 
-  public function getMetadata(modId:String, ?origin:PolymodErrorOrigin):Null<ModMetadata>
+  @:deprecated("getMetadata is deprecated, use getMetadataByDir")
+  public function getMetadata(dirName:String, ?origin:PolymodErrorOrigin):Null<ModMetadata>
   {
-    var modPath = Util.pathJoin(modRoot, modId);
+    return getMetadataByDir(dirName, origin);
+  }
+
+  public function getMetadataByDir(dirName:String, ?origin:PolymodErrorOrigin):Null<ModMetadata>
+  {
+    var modPath = Util.pathJoin(modRoot, dirName);
     if (exists(modPath))
     {
       var meta:ModMetadata = null;
@@ -129,7 +135,8 @@ class SysFileSystem implements IFileSystem
 
       if (meta == null) return null;
 
-      meta.id = modId;
+      meta.id = meta.id == '' ? dirName : meta.id;
+      meta.dirName = dirName;
       meta.modPath = modPath;
 
       if (!exists(iconFile))
@@ -146,8 +153,52 @@ class SysFileSystem implements IFileSystem
     }
     else
     {
-      Polymod.error(MOD_MISSING_DIRECTORY, 'Could not find mod directory: $modId', origin);
+      Polymod.error(MOD_MISSING_DIRECTORY, 'Could not find mod directory: $dirName', origin);
     }
+    return null;
+  }
+
+  public function getMetadataById(modId:String, ?origin:PolymodErrorOrigin):Null<ModMetadata>
+  {
+    // TODO: Cache mod IDs so we don't iterate over the whole mods folder every time we call this!
+    for (dir in readDirectory(modRoot))
+    {
+      var modPath = Util.pathJoin(modRoot, dir);
+      if (exists(modPath))
+      {
+        var meta:ModMetadata = null;
+
+        var metaFile = Util.pathJoin(modPath, PolymodConfig.modMetadataFile);
+        var iconFile = Util.pathJoin(modPath, PolymodConfig.modIconFile);
+
+        if (!exists(metaFile)) continue;
+        else
+        {
+          var metaText = getFileContent(metaFile);
+          meta = ModMetadata.fromJsonStr(metaText, origin);
+        }
+
+        if (meta == null) continue;
+
+        if (meta.id != modId && dir != modId) continue;
+        meta.dirName = dir;
+        meta.modPath = modPath;
+
+        if (!exists(iconFile))
+        {
+          Polymod.warning(MOD_MISSING_ICON, 'Could not find mod icon file: $iconFile', origin);
+        }
+        else
+        {
+          var iconBytes = getFileBytes(iconFile);
+          meta.icon = iconBytes;
+          meta.iconPath = iconFile;
+        }
+
+        return meta;
+      }
+    }
+    Polymod.error(MOD_MISSING_ID, 'Could not find mod with ID: $modId', origin);
     return null;
   }
 
@@ -168,7 +219,7 @@ class SysFileSystem implements IFileSystem
     return all;
   }
 
-  #if linux
+  #if (!windows)
   /**
    * Returns a path to the existing file similar to the given one.
    * (For instance "mod/firelight" and  "Mod/FireLight" are *similar* paths)

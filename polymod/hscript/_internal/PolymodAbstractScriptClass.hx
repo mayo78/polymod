@@ -66,7 +66,7 @@ abstract PolymodAbstractScriptClass(PolymodScriptClass) from PolymodScriptClass
           {
             if (v.expr != null)
             {
-              varValue = this._interp.expr(v.expr);
+              varValue = this._interp.exprWithType(v.expr, v.type);
               this._interp.variables.set(name, varValue);
             }
           }
@@ -244,6 +244,7 @@ abstract PolymodAbstractScriptClass(PolymodScriptClass) from PolymodScriptClass
       @:privateAccess this._interp.error(EInvalidAccess(name));
       // throw "field '" + name + "' does not exist in script class '" + this.fullyQualifiedName + "' or super class '" + Type.getClassName(Type.getClass(this.superClass)) + "'";
     }
+    return null;
   }
 
   private static function retrieveClassObjectFields(o:Dynamic):Array<String>

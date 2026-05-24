@@ -75,6 +75,7 @@ class PolymodScriptClassMacro
 
   #if macro
   static var onGenerateCallbackRegistered:Bool = false;
+  @:persistent
   static var onAfterTypingCallbackRegistered:Bool = false;
 
   static function onGenerate(allTypes:Array<haxe.macro.Type>)
@@ -377,6 +378,7 @@ class PolymodScriptClassMacro
                 case FMethod(k):
                   if (k != MethInline) continue;
                   if (abstractPath.startsWith('cpp')) continue;
+                  if (abstractPath.startsWith('hl')) continue;
                   if (abstractPath.startsWith('flixel.graphics.atlas.HashOrArray')) continue; // has to be ragebait
                   if (abstractType.isPrivate) continue;
 
