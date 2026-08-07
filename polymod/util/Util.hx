@@ -13,7 +13,7 @@ import polymod.format.ParseRules.TextFileFormat;
 import polymod.format.ParseRules;
 import polymod.fs.PolymodFileSystem.IFileSystem;
 import polymod.hscript._internal.Expr.ClassDecl;
-import polymod.hscript._internal.PolymodEnumDeclEx;
+import polymod.hscript._internal.Expr.EnumDecl;
 #if unifill
 import unifill.Unifill;
 #end
@@ -737,7 +737,7 @@ class Util
 	 * @param eDecl The enum declaration.
 	 * @return String
 	 */
-	public static function getFullEnumName(eDecl:PolymodEnumDeclEx):String
+	public static function getFullEnumName(eDecl:EnumDecl):String
 	{
 		return (eDecl.pkg != null ? (eDecl.pkg.join(".") + ".") : "") + eDecl.name;
 	}
