@@ -17,15 +17,24 @@ class PolymodStaticClassReference {
 		this.cls = cls;
 	}
 
-	public static function tryBuild(clsName:String):Null<PolymodStaticClassReference> {
-		@:privateAccess {
-			if (PolymodInterpEx._scriptClassDescriptors.exists(clsName)) {
-				return new PolymodStaticClassReference(PolymodInterpEx._scriptClassDescriptors.get(clsName));
-			} else {
-				return null;
-			}
-		}
-	}
+  /**
+   * Build a static class reference for the given scripted class name, if it exists
+   * @param clsName The name of the scripted class
+   * @return The static class reference, or `null` if the scripted class doesn't exist
+   */
+  public static function tryBuild(clsName:String):Null<PolymodStaticClassReference>
+  {
+    @:privateAccess {
+      if (Interp._scriptClassDescriptors.exists(clsName))
+      {
+        return new PolymodStaticClassReference(Interp._scriptClassDescriptors.get(clsName));
+      }
+      else
+      {
+        return null;
+      }
+    }
+  }
 
 	/**
 	 * Return a scripted instance of this script class.
